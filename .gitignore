@@ -1,0 +1,17 @@
+# third-party source trees kept for research only (see research/README.md)
+/research/sources/
+
+# Rust
+/target/
+
+# macOS
+.DS_Store
+/research/*
+# Swift
+/app/.build/
+
+# Release builds
+/engine/
+/staging/
+*.dmg
+*.dmg.sha256

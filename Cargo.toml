@@ -1,0 +1,20 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/d3d9-bytecode",
+    "crates/launcher",
+    "crates/shader-ir",
+    "crates/msl-emitter",
+    "crates/wine-test-corpus",
+]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+publish = false
+license = "MIT"
+repository = "https://github.com/LitHaxor/crossfree"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"

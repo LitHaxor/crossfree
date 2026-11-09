@@ -1,0 +1,3 @@
+# Code is written to 120 columns; see AGENTS.md.
+max_width = 120
+use_small_heuristics = "Max"
