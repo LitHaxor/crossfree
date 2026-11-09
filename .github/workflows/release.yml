@@ -1,0 +1,111 @@
+name: Release
+
+# Pushing a tag like v0.1.0 builds crossfree.app with the engine inside,
+# packs it into a DMG and publishes a GitHub release with it.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release (e.g. v0.1.0)
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: 1.94.1
+  # The engine shipped inside the app: mach9's prebuilt arm64 Wine + FEX.
+  # Its signed loader (wine.app) is shipped exactly as released.
+  MACH9_TAG: v0.2.0
+  MACH9_ASSET: wine-v0.2.0-macos-arm64.tar.xz
+  MACH9_SHA256: 243bcc4523be6777e7b22fe3f30f92d9cdfbd3adbeb6e7371c15c7fc7f68a324
+
+jobs:
+  dmg:
+    name: Build the DMG
+    runs-on: macos-26
+    steps:
+      - name: Version
+        id: version
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.version.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Download the engine
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$MACH9_TAG" --repo athei/mach9 --pattern "$MACH9_ASSET" --dir engine
+          echo "$MACH9_SHA256  engine/$MACH9_ASSET" | shasum -a 256 -c -
+          tar xJf "engine/$MACH9_ASSET" -C engine
+          codesign --verify --strict engine/wine/lib/wine/aarch64-unix/wine.app
+
+      - name: Test
+        env:
+          # The Wine shader corpus is checked by CI; not needed to ship.
+          CF_REQUIRE_WINE_CORPUS: "0"
+        run: |
+          cargo test --workspace --locked
+          swift test --package-path app
+
+      - name: Build crossfree.app
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          CROSSFREE_ENGINE="$PWD/engine/wine" ./tools/build-app.sh
+          codesign --verify target/crossfree.app
+          codesign --verify --strict target/crossfree.app/Contents/SharedSupport/engine/lib/wine/aarch64-unix/wine.app
+
+      - name: Make the DMG
+        id: dmg
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dmg="crossfree-$VERSION.dmg"
+          mkdir -p staging
+          ditto target/crossfree.app staging/crossfree.app
+          ln -s /Applications staging/Applications
+          # hdiutil is occasionally busy on CI machines: retry.
+          for _ in 1 2 3; do
+            hdiutil create -volname "crossfree $VERSION" -srcfolder staging -fs APFS -format ULMO -ov "$dmg" && break
+            sleep 10
+          done
+          test -f "$dmg"
+          shasum -a 256 "$dmg" > "$dmg.sha256"
+          ls -lh "$dmg"
+          echo "file=$dmg" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          DMG: ${{ steps.dmg.outputs.file }}
+        run: |
+          cat > notes.md <<NOTES
+          ## Install
+
+          1. Open \`$DMG\` and drag **crossfree** to **Applications**.
+          2. This build is not notarized yet, so macOS blocks a downloaded copy. Clear the quarantine once:
+             \`\`\`sh
+             xattr -dr com.apple.quarantine /Applications/crossfree.app
+             \`\`\`
+          3. Open crossfree, go to **Directory** and install Steam or another store.
+
+          Requires an Apple silicon Mac with **macOS 26.4** or later.
+
+          The engine inside is [mach9 $MACH9_TAG](https://github.com/athei/mach9/releases/tag/$MACH9_TAG): arm64 Wine, FEX, mtld3d, DXMT and vkd3d-proton, each under its own license. Its signed loader ships unmodified.
+          NOTES
+          gh release create "$TAG" "$DMG" "$DMG.sha256" \
+            --title "crossfree $VERSION" --notes-file notes.md --generate-notes --verify-tag
