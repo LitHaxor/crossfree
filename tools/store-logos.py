@@ -12,7 +12,6 @@ the directory and icon streams of an .msi (a compound file).
 Standard library only, plus macOS `sips` to turn BMP icon images into PNG.
 """
 
-import io
 import re
 import struct
 import subprocess
@@ -284,7 +283,7 @@ def write_png(image, path):
 
 def main():
     text = CATALOG.read_text()
-    stores = re.findall(r'id: "([a-z0-9]+)".*?installer: URL\(string: "([^"]+)"\)', text, re.S)
+    stores = re.findall(r'id: "([a-z0-9]+)".*?installer: URL\(string: "([^"]+)"\)', text, re.DOTALL)
     if not stores:
         sys.exit(f"no stores found in {CATALOG}")
     OUT.mkdir(parents=True, exist_ok=True)
@@ -293,7 +292,9 @@ def main():
         reader = Remote(url)
         try:
             images = msi_icon_images(reader) or pe_icon_images(reader)
-        except Exception as error:  # report every store, then fail
+        # A failed download (URLError is an OSError) or a malformed file:
+        # report every store, then fail.
+        except (OSError, ValueError, struct.error, IndexError, StopIteration) as error:
             images = []
             print(f"{store_id}: {error}", file=sys.stderr)
         if not images:
