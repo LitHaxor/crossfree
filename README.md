@@ -19,9 +19,6 @@
 
 ## Why crossfree
 
-- **Games, not bottles.** Install Steam or a game and it shows up as a game. Every installer gets its own
-  Windows behind the scenes, so one game can never break another; there are no "bottles", Wine settings or
-  engines to manage.
 - **Native on Apple silicon.** arm64 Wine runs Windows on your Mac directly, and [FEX](https://github.com/FEX-Emu/FEX)
   translates x86 and x64 game code to arm64. Direct3D 9 runs on Metal through mtld3d, Direct3D 10 and 11
   through DXMT, Direct3D 12 through vkd3d-proton.
