@@ -1,0 +1,23 @@
+[package]
+name = "launcher"
+version = "0.1.0"
+description = "crossfree's launcher core: engine, Wine prefixes, per-game rules, launching"
+edition.workspace = true
+# Above the workspace's 1.85 for `File::lock` (1.89), which serialises
+# concurrent changes to a bottle's settings.
+rust-version = "1.89"
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "crossfree"
+path = "src/main.rs"
+
+[dependencies]
+# The engine's rule format. Must be the same release as the engine bundle
+# (mach9's launcher contract); see docs/spikes/s5-arm64-wine-fex.md.
+compatdb-core = { git = "https://github.com/athei/mach9", tag = "v0.2.0" }
+
+[lints]
+workspace = true
