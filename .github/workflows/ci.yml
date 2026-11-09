@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # The toolchain crossfree is developed with; newer ones may add lints.
+  RUST_TOOLCHAIN: 1.94.1
+  # Wine's D3D9 tests, the shader crates' corpus (see crates/wine-test-corpus).
+  CROSSOVER_SOURCES: https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz
+  CORPUS_DIR: research/sources/crossover-26.3.0/wine/dlls/d3d9/tests
+
+jobs:
+  lint:
+    name: Format and lint
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: rustfmt
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: swift-format
+        run: swift format lint --strict -r app/Sources app/Tests app/Package.swift tools/make-icon.swift
+
+  scripts:
+    name: Scripts and workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck tools/*.sh
+      - name: ruff
+        run: pipx run ruff check tools
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint -color
+
+  rust:
+    name: Rust tests
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Cache Wine's D3D9 tests
+        id: corpus
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CORPUS_DIR }}
+          key: crossover-sources-26.3.0-d3d9-tests
+      - name: Fetch Wine's D3D9 tests
+        if: steps.corpus.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p research/sources/crossover-26.3.0
+          curl -fsSL --retry 3 "$CROSSOVER_SOURCES" \
+            | tar xzf - -C research/sources/crossover-26.3.0 --strip-components=1 sources/wine/dlls/d3d9/tests
+          test -f "$CORPUS_DIR/visual.c"
+      - name: Test
+        # CI is set, so a missing corpus fails instead of being skipped.
+        run: cargo test --workspace --locked
+
+  app:
+    name: App tests
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift version
+        run: swift --version
+      - name: Test
+        run: swift test --package-path app
