@@ -61,7 +61,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Cache Wine's D3D9 tests
         id: corpus
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.CORPUS_DIR }}
           key: crossover-sources-26.3.0-d3d9-tests
