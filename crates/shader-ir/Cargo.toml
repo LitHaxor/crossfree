@@ -1,0 +1,18 @@
+[package]
+name = "shader-ir"
+version = "0.1.0"
+description = "Translation IR for Direct3D 9 shaders: structured control flow and resolved register semantics"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+d3d9-bytecode = { path = "../d3d9-bytecode" }
+
+[dev-dependencies]
+wine-test-corpus = { path = "../wine-test-corpus" }
+
+[lints]
+workspace = true
