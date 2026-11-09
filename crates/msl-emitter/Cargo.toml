@@ -1,0 +1,19 @@
+[package]
+name = "msl-emitter"
+version = "0.1.0"
+description = "Emits Metal Shading Language from the shader IR"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+shader-ir = { path = "../shader-ir" }
+
+[dev-dependencies]
+d3d9-bytecode = { path = "../d3d9-bytecode" }
+wine-test-corpus = { path = "../wine-test-corpus" }
+
+[lints]
+workspace = true
