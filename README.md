@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://lithaxor.github.io/crossfree/"><img alt="Website" src="https://img.shields.io/badge/website-crossfree-66bdff?style=for-the-badge"></a>
   <a href="https://github.com/LitHaxor/crossfree/releases/latest"><img alt="Download for macOS" src="https://img.shields.io/github/v/release/LitHaxor/crossfree?label=download&style=for-the-badge&color=5865f2"></a>
   <a href="https://github.com/LitHaxor/crossfree/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/LitHaxor/crossfree/ci.yml?branch=main&style=for-the-badge&label=CI"></a>
   <img alt="macOS 26.4 or later on Apple silicon" src="https://img.shields.io/badge/macOS_26.4+-Apple_silicon-111111?style=for-the-badge&logo=apple">
