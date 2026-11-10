@@ -1,0 +1,39 @@
+name: Website
+
+# Publishes site/ (the landing page) to GitHub Pages, with the README's
+# screenshots copied in from docs/images.
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", "docs/images/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy the website
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble
+        run: |
+          mkdir -p _site
+          cp -R site/. _site/
+          cp docs/images/hero.jpg docs/images/directory.jpg _site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
