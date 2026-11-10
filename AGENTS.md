@@ -76,3 +76,12 @@ CROSSFREE_ENGINE=/path/to/mach9/wine ./tools/build-app.sh && open target/crossfr
 - CI (`.github/workflows/ci.yml`) must pass. Tag `vX.Y.Z` to release:
   `release.yml` builds the app with the engine inside, packs a DMG and
   publishes it.
+- Releases are signed and notarized when these repository secrets exist
+  (otherwise they are signed ad hoc):
+  - `MACOS_CERTIFICATE`, `MACOS_CERTIFICATE_PASSWORD`: a Developer ID
+    Application certificate with its private key, as a base64 `.p12`;
+  - `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`: an App Store
+    Connect API key (Developer role), the `.p8` in base64.
+
+  `HARDENED_RUNTIME=1 ./tools/build-app.sh` signs a local build the way a
+  release is signed (ad hoc), to try it.

@@ -2,6 +2,10 @@ name: Release
 
 # Pushing a tag like v0.1.0 builds crossfree.app with the engine inside,
 # packs it into a DMG and publishes a GitHub release with it.
+#
+# With the signing secrets set (see AGENTS.md), the app and the DMG are
+# signed with a Developer ID, notarized by Apple and stapled, so they open
+# without any warning. Without them, the build is signed ad hoc.
 on:
   push:
     tags: ["v*"]
@@ -27,6 +31,8 @@ jobs:
   dmg:
     name: Build the DMG
     runs-on: macos-26
+    env:
+      SIGNING: ${{ secrets.MACOS_CERTIFICATE != '' }}
     steps:
       - name: Version
         id: version
@@ -59,13 +65,47 @@ jobs:
           cargo test --workspace --locked
           swift test --package-path app
 
+      - name: Import the signing certificate
+        if: env.SIGNING == 'true'
+        env:
+          CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          API_KEY: ${{ secrets.APPLE_API_KEY }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password=$(openssl rand -hex 24)
+          printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$CERTIFICATE_PASSWORD" -f pkcs12 -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain"
+          rm "$RUNNER_TEMP/certificate.p12"
+          identity=$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -n 1)
+          test -n "$identity"
+          echo "Signing as $identity"
+          echo "SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+          printf '%s' "$API_KEY" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          echo "NOTARY_KEY=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+
       - name: Build crossfree.app
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           CROSSFREE_ENGINE="$PWD/engine/wine" ./tools/build-app.sh
-          codesign --verify target/crossfree.app
+          codesign --verify --strict target/crossfree.app
           codesign --verify --strict target/crossfree.app/Contents/SharedSupport/engine/lib/wine/aarch64-unix/wine.app
+
+      - name: Notarize the app
+        if: env.SIGNING == 'true'
+        env:
+          NOTARY_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          ditto -c -k --keepParent target/crossfree.app "$RUNNER_TEMP/crossfree.zip"
+          ./tools/notarize.sh "$RUNNER_TEMP/crossfree.zip" target/crossfree.app
+          spctl --assess --type exec -vv target/crossfree.app
 
       - name: Make the DMG
         id: dmg
@@ -82,9 +122,25 @@ jobs:
             sleep 10
           done
           test -f "$dmg"
-          shasum -a 256 "$dmg" > "$dmg.sha256"
-          ls -lh "$dmg"
           echo "file=$dmg" >> "$GITHUB_OUTPUT"
+
+      - name: Notarize the DMG
+        if: env.SIGNING == 'true'
+        env:
+          DMG: ${{ steps.dmg.outputs.file }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG"
+          ./tools/notarize.sh "$DMG"
+          spctl --assess --type open --context context:primary-signature -vv "$DMG"
+
+      - name: Checksum
+        env:
+          DMG: ${{ steps.dmg.outputs.file }}
+        run: |
+          shasum -a 256 "$DMG" > "$DMG.sha256"
+          ls -lh "$DMG"
 
       - name: Publish the release
         env:
@@ -93,19 +149,30 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           DMG: ${{ steps.dmg.outputs.file }}
         run: |
-          cat > notes.md <<NOTES
-          ## Install
-
-          1. Open \`$DMG\` and drag **crossfree** to **Applications**.
-          2. This build is not notarized yet, so macOS blocks a downloaded copy. Clear the quarantine once:
-             \`\`\`sh
-             xattr -dr com.apple.quarantine /Applications/crossfree.app
-             \`\`\`
-          3. Open crossfree, go to **Directory** and install Steam or another store.
-
-          Requires an Apple silicon Mac with **macOS 26.4** or later.
-
-          The engine inside is [mach9 $MACH9_TAG](https://github.com/athei/mach9/releases/tag/$MACH9_TAG): arm64 Wine, FEX, mtld3d, DXMT and vkd3d-proton, each under its own license. Its signed loader ships unmodified.
-          NOTES
+          {
+            echo "## Install"
+            echo
+            echo "1. Open \`$DMG\` and drag **crossfree** to **Applications**."
+            if [ "$SIGNING" = true ]; then
+              echo "2. Open crossfree: it is signed and notarized by Apple."
+            else
+              echo "2. This build is not notarized, so macOS blocks a downloaded copy. Clear the quarantine once:"
+              echo '   ```sh'
+              echo '   xattr -dr com.apple.quarantine /Applications/crossfree.app'
+              echo '   ```'
+            fi
+            echo "3. Go to **Directory** and install Steam or another store."
+            echo
+            echo "Requires an Apple silicon Mac with **macOS 26.4** or later."
+            echo
+            echo "The engine inside is [mach9 $MACH9_TAG](https://github.com/athei/mach9/releases/tag/$MACH9_TAG):" \
+              "arm64 Wine, FEX, mtld3d, DXMT and vkd3d-proton, each under its own license. Its signed loader ships unmodified."
+          } > notes.md
           gh release create "$TAG" "$DMG" "$DMG.sha256" \
             --title "crossfree $VERSION" --notes-file notes.md --generate-notes --verify-tag
+
+      - name: Remove the signing keychain
+        if: always() && env.SIGNING == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
