@@ -30,7 +30,7 @@ jobs:
         run: |
           mkdir -p _site
           cp -R site/. _site/
-          cp docs/images/hero.jpg docs/images/directory.jpg _site/
+          cp docs/images/directory.jpg _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
