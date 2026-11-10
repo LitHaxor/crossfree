@@ -4,8 +4,8 @@
 
 <p align="center">
   <b>Play Windows games on your Mac.</b><br>
-  An open-source alternative to CrossOver for Apple silicon. crossfree sets up Steam, Epic Games, GOG
-  and four other stores for you, then runs their Windows games on your Mac's own chip with Wine and FEX.
+  An open-source alternative to CrossOver for Apple silicon. crossfree installs Steam and other game stores
+  for you, and runs Windows games on your Mac's own chip with Wine and FEX.
 </p>
 
 <p align="center">
@@ -22,20 +22,21 @@
 
 - **Native on Apple silicon.** arm64 Wine runs Windows on your Mac directly, and [FEX](https://github.com/FEX-Emu/FEX)
   translates x86 and x64 game code to arm64. Direct3D 9 runs on Metal through mtld3d, Direct3D 10 and 11
-  through DXMT, Direct3D 12 through vkd3d-proton.
-- **Seven stores in one Directory.** Pick Steam, Epic Games, GOG Galaxy, Battle.net, the EA app, Ubisoft Connect
+  through DXMT, Direct3D 12 through vkd3d-proton. Nothing runs in a virtual machine or through Rosetta.
+- **Game stores in one Directory.** Pick Steam, Epic Games, GOG Galaxy, Battle.net, the EA app, Ubisoft Connect
   or the Rockstar Games Launcher, and crossfree runs the installer from its maker and adds the store to your games.
-- **A console on your Mac.** Your games in one row with their Steam art. Move with the arrow keys or a
-  PlayStation or Xbox controller; a game that is already open comes back to the front instead of starting twice.
-- **Feels like a Mac app.** In the Dock, a game shows up under its own name and icon, not as "wine", and
-  crossfree knows which games are running.
-- **Free and open source.** MIT licensed, with no account and nothing that phones home.
+- **A console on your Mac.** Your games sit in one row, and Steam games bring their art from your Steam library.
+  The arrow keys or a PlayStation, Xbox or other MFi controller move between them, and Play brings a game that is
+  already open back to the front.
+- **Feels like a Mac app.** In the Dock, Steam shows up as Steam, not as "wine", and crossfree knows which games
+  are running.
+- **Free and open source.** It is MIT licensed. There is no account, and crossfree sends no telemetry.
 
 ## Download
 
 1. Download the latest **`crossfree-<version>.dmg`** from [Releases](https://github.com/LitHaxor/crossfree/releases/latest),
    open it and drag **crossfree** to **Applications**.
-2. crossfree is not notarized yet, so macOS blocks a downloaded copy. Clear the quarantine once:
+2. If macOS won't open crossfree, the release you have isn't notarized. Clear the quarantine once:
    ```sh
    xattr -dr com.apple.quarantine /Applications/crossfree.app
    ```
@@ -43,7 +44,7 @@
 
 **Requirements:** a Mac with Apple silicon (M1 or later) and macOS 26.4 or later.
 
-![The Directory: Steam, Epic Games, GOG Galaxy, Battle.net and more, one click each](docs/images/directory.jpg)
+![The Directory, listing Steam, Epic Games, GOG Galaxy, Battle.net and the other stores](docs/images/directory.jpg)
 
 ## How it works
 
