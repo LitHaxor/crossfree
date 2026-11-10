@@ -145,8 +145,7 @@ saved per-game profiles and a compatibility database. Releases are built by
 
 crossfree stands on [mach9](https://github.com/athei/mach9) (zlib), [Wine](https://www.winehq.org) (LGPL),
 [FEX](https://github.com/FEX-Emu/FEX) (MIT), mtld3d, [DXMT](https://github.com/3Shain/dxmt) and
-[vkd3d-proton](https://github.com/HansKristian-Work/vkd3d-proton), each under its own license. Its shader tests use
-the D3D9 tests from CodeWeavers' LGPL CrossOver sources.
+[vkd3d-proton](https://github.com/HansKristian-Work/vkd3d-proton), each under its own license. 
 
 Store names and logos belong to their owners. crossfree is not affiliated with CodeWeavers, Valve, Epic Games, GOG,
 Blizzard, Electronic Arts, Ubisoft, Rockstar Games or Microsoft.
