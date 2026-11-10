@@ -37,6 +37,20 @@ struct CatalogTests {
         }
     }
 
+    /// The README and the landing page list the stores by name, so a store
+    /// added to the catalog must be added to them too.
+    @Test func theReadmeAndTheSiteNameEveryStore() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        for page in ["README.md", "site/index.html"] {
+            let text = try String(contentsOf: root.appendingPathComponent(page), encoding: .utf8)
+            for item in Catalog.items {
+                #expect(text.contains(item.name), "\(page) doesn't name \(item.name)")
+            }
+        }
+    }
+
     /// Grey brands (Epic) get the default backdrop hue, not red.
     @Test func greyBrandsGetTheDefaultHue() {
         let epic = Catalog.items.first { $0.id == "epic" }!
