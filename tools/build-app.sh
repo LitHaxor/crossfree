@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds target/crossfree.app: the SwiftUI app (app/) with the crossfree
-# command-line tool (crates/launcher) inside it, signed ad hoc.
+# command-line tool (crates/launcher) inside it.
 #
 #   CONFIG=debug|release   build configuration (default: release)
 #   VERSION=X.Y.Z           the app's version (default: 0.1.0; releases pass
@@ -9,6 +9,12 @@
 #                           (Contents/SharedSupport/engine), as CrossOver
 #                           ships its Wine: the app then needs no setup, and
 #                           macOS does not ask for access to wherever DIR is
+#   SIGN_IDENTITY=NAME      a Developer ID Application identity: signs every
+#                           program inside with the hardened runtime and a
+#                           secure timestamp, as notarization requires
+#                           (default: ad hoc, for local builds)
+#   HARDENED_RUNTIME=1      signs ad hoc the way a Developer ID build does, to
+#                           try that build locally
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -70,6 +76,31 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --sign - "$app/Contents/Resources/crossfree"
-codesign --force --sign - "$app"
+identity=${SIGN_IDENTITY:--}
+if [ "$identity" != - ]; then
+    sign_flags="--options runtime --timestamp"
+elif [ "${HARDENED_RUNTIME:-0}" = 1 ]; then
+    sign_flags="--options runtime"
+else
+    sign_flags=
+fi
+
+sign() {
+    # shellcheck disable=SC2086 # the flags are separate words, or none
+    codesign --force $sign_flags --sign "$identity" "$@"
+}
+
+# A Developer ID build signs the engine's programs and libraries as its
+# own; ad hoc ones keep the signatures they came with. The loader,
+# wine.app, always keeps mach9's notarized signature, which carries the
+# entitlements Wine needs (and needs no more for notarization).
+engine="$app/Contents/SharedSupport/engine"
+if [ -n "$sign_flags" ] && [ -d "$engine" ]; then
+    find "$engine" -type f ! -path '*/wine.app/*' -print0 \
+        | xargs -0 file -N --mime-type -F ' :: ' \
+        | sed -n 's/ :: *application\/x-mach-binary$//p' \
+        | while IFS= read -r program; do sign "$program"; done
+fi
+sign "$app/Contents/Resources/crossfree"
+sign "$app"
 echo "$app"
