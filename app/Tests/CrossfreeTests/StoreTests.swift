@@ -12,7 +12,8 @@ final class FakeCLI {
     /// Prefixes made with `prefix create`, one name per line.
     let created: URL
 
-    init(notarized: Bool = true) throws {
+    /// `startFails`: `start` answers as for a missing prefix.
+    init(notarized: Bool = true, startFails: Bool = true) throws {
         dir = FileManager.default.temporaryDirectory.appendingPathComponent("crossfree-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         script = dir.appendingPathComponent("crossfree")
@@ -43,7 +44,7 @@ final class FakeCLI {
                 sleep $delay
                 echo "end $4" >> '\(record.path)'
                 printf '{"d3d9":"%s","dxgi":"auto","msync":true,"metal_hud":false}\\n' "$4";;
-            start) echo 'crossfree: no prefix named "b"' >&2; exit 2;;
+            start) \(startFails ? "echo 'crossfree: no prefix named \"b\"' >&2; exit 2" : "exit 0");;
             tool) exit 3;;
             run) echo "program output"; exit 7;;
             esac
@@ -160,6 +161,50 @@ struct StoreTests {
             })
         try? await Task.sleep(nanoseconds: 200_000_000)
         #expect(store.errorMessage == nil)
+    }
+
+    /// Play on a game that is still starting (its window not up yet, say
+    /// after the splash was closed) waits for it again rather than start a
+    /// second copy; it is starting until its window comes up, or for
+    /// ``Store/windowWait`` if it does not run.
+    @Test func aGameStillStartingIsNotStartedTwice() async throws {
+        let fake = try FakeCLI(startFails: false)
+        let store = Store(cli: fake.cli)
+        await store.refresh()
+        let starts = { fake.lines.filter { $0.hasSuffix("start b /p/b/Game.lnk") }.count }
+
+        store.start(bottle, app: game)
+        store.start(bottle, app: game)
+        #expect(await eventually { store.running["b", default: 0] == 0 && starts() == 1 })
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        #expect(starts() == 1)
+        #expect(store.isStarting(game))
+
+        let later = Date().addingTimeInterval(Store.windowWait + 1)
+        #expect(!store.isStarting(game, now: later))
+        store.update(running: [game.id], shown: [])
+        #expect(store.isStarting(game, now: later))
+
+        // Its window came up: Play starts it again from now on (Steam in
+        // the tray has no window, and starting it shows its window).
+        store.update(running: [game.id], shown: [game.id])
+        #expect(!store.isStarting(game))
+        store.start(bottle, app: game)
+        #expect(await eventually { starts() == 2 })
+    }
+
+    /// A start that fails is not starting any more: Play tries again.
+    @Test func aFailedStartCanBeRetried() async throws {
+        let fake = try FakeCLI()
+        let store = Store(cli: fake.cli)
+        await store.refresh()
+
+        store.start(bottle, app: game)
+        #expect(await eventually { store.errorMessage != nil })
+        #expect(!store.isStarting(game))
+        store.errorMessage = nil
+        store.start(bottle, app: game)
+        #expect(await eventually { fake.lines.filter { $0.hasSuffix("start b /p/b/Game.lnk") }.count == 2 })
     }
 
     /// An installer gets a Windows of its own, named after it; one for a

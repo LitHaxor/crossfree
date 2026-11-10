@@ -30,6 +30,12 @@ final class Store: ObservableObject {
     /// The games running now (their IDs), seen every two seconds.
     @Published private(set) var runningGames: Set<String> = []
     private var runningWatch: Task<Void, Never>?
+    /// Games started from Play whose window has not come up yet (their
+    /// IDs), and when each started: Play on one waits for its window instead
+    /// of starting a second copy.
+    private(set) var starting: [String: Date] = [:]
+    /// The wait for each game's window (``bringToFront(_:_:)``), by ID.
+    private var windowWaits: [String: Task<Void, Never>] = [:]
     /// When each app (by shortcut path) was last opened from crossfree.
     @Published private(set) var lastPlayed: [String: Date] = [:]
     /// The store from the catalog being installed, if any.
@@ -455,7 +461,9 @@ final class Store: ObservableObject {
             bottle, ["run", bottle.name, "--", file.path], what: "“\(file.lastPathComponent)”", statusIsFailure: false)
     }
 
-    /// Opens an app's shortcut, and remembers that it was played.
+    /// Opens an app's shortcut, and remembers that it was played. A game
+    /// still starting is not started again (closing the splash and pressing
+    /// Play would otherwise run a second copy): it is waited for once more.
     func start(_ bottle: Bottle, app: AppShortcut) {
         guard engine != nil else {
             errorMessage = engineProblem ?? "There is no usable engine. Choose one first."
@@ -463,8 +471,23 @@ final class Store: ObservableObject {
         }
         lastPlayed[app.id] = Date()
         defaults?.set(lastPlayed.mapValues(\.timeIntervalSince1970), forKey: Store.lastPlayedKey)
-        spawn(bottle, ["start", bottle.name, app.path], what: "“\(app.name)”", statusIsFailure: true)
+        if !isStarting(app) {
+            starting[app.id] = Date()
+            spawn(bottle, ["start", bottle.name, app.path], what: "“\(app.name)”", statusIsFailure: true) {
+                [weak self] in
+                self?.starting[app.id] = nil
+            }
+        }
         bringToFront(bottle, app)
+    }
+
+    /// Whether a game started from Play is still coming up: no window yet,
+    /// and started within ``windowWait`` or still running. A game that
+    /// showed its window once is not (Steam closed to the tray starts
+    /// again, which brings its window back).
+    func isStarting(_ app: AppShortcut, now: Date = Date()) -> Bool {
+        guard let since = starting[app.id] else { return false }
+        return now.timeIntervalSince(since) < Store.windowWait || runningGames.contains(app.id)
     }
 
     // MARK: Running games
@@ -480,13 +503,25 @@ final class Store: ObservableObject {
         }
     }
 
-    /// Updates ``runningGames`` from Wine's processes.
+    /// Updates ``runningGames`` from Wine's processes, and notes the
+    /// starting games whose window came up meanwhile (a slow one may take
+    /// longer than ``bringToFront(_:_:)`` waits).
     func updateRunning() {
         let processes = WineProcesses.list()
         let running = Set(
             allApps.filter { item in
                 !WineProcesses.runs(item.app, prefix: item.bottle.path, in: processes).isEmpty
             }.map(\.app.id))
+        let shown = Set(
+            allApps.filter { item in
+                starting[item.app.id] != nil && !windows(of: item.app, in: item.bottle, among: processes).isEmpty
+            }.map(\.app.id))
+        update(running: running, shown: shown)
+    }
+
+    /// Records the games that run, and those whose window is up.
+    func update(running: Set<String>, shown: Set<String>) {
+        for id in shown { starting[id] = nil }
         if running != runningGames { runningGames = running }
     }
 
@@ -494,8 +529,10 @@ final class Store: ObservableObject {
     /// (see ``WineProcesses/runs(_:prefix:in:helpers:)``), or else those
     /// running under its name in the Dock (a program its shortcut does not
     /// name).
-    func windows(of app: AppShortcut, in bottle: Bottle) -> [NSRunningApplication] {
-        let processes = WineProcesses.runs(app, prefix: bottle.path, in: WineProcesses.list(), helpers: true)
+    func windows(
+        of app: AppShortcut, in bottle: Bottle, among all: [WineProcesses.Process]? = nil
+    ) -> [NSRunningApplication] {
+        let processes = WineProcesses.runs(app, prefix: bottle.path, in: all ?? WineProcesses.list(), helpers: true)
         let own =
             processes
             .compactMap { NSRunningApplication(processIdentifier: $0.pid) }
@@ -535,16 +572,19 @@ final class Store: ObservableObject {
 
     /// Brings the game's window to the front once it has one: crossfree's
     /// own window would otherwise stay in front of it. Gives up after
-    /// ``windowWait``.
+    /// ``windowWait``; waiting again replaces the wait before.
     func bringToFront(_ bottle: Bottle, _ app: AppShortcut) {
         shownGame = nil
-        Task {
+        windowWaits[app.id]?.cancel()
+        windowWaits[app.id] = Task {
             for _ in 0..<Int(Store.windowWait * 2) {
+                if Task.isCancelled { return }
                 let running = windows(of: app, in: bottle)
                 if !running.isEmpty {
                     // Steam, say, is two: its client and the helper that
                     // draws its window.
                     Store.activate(running)
+                    starting[app.id] = nil
                     shownGame = app.id
                     return
                 }
@@ -608,7 +648,10 @@ final class Store: ObservableObject {
     /// Starts `args` without waiting. The program's output goes to the
     /// bottle's log; a failure to start it (see ``CLI/launchFailure``) is
     /// reported when the tool exits.
-    private func spawn(_ bottle: Bottle, _ args: [String], what: String, statusIsFailure: Bool) {
+    private func spawn(
+        _ bottle: Bottle, _ args: [String], what: String, statusIsFailure: Bool,
+        failed: (@MainActor () -> Void)? = nil
+    ) {
         guard let cli else { return }
         guard engine != nil else {
             errorMessage = engineProblem ?? "There is no usable engine. Choose one first."
@@ -625,6 +668,7 @@ final class Store: ObservableObject {
                         what, in: name, status: status, output: output, statusIsFailure: statusIsFailure
                     ) {
                         self.errorMessage = failure
+                        failed?()
                     }
                     if let bottle = self.bottles.first(where: { $0.name == name }) {
                         await self.loadApps(bottle)
@@ -634,6 +678,7 @@ final class Store: ObservableObject {
         } catch {
             running[name] = max((running[name] ?? 1) - 1, 0)
             report(error)
+            failed?()
         }
     }
 
