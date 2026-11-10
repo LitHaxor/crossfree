@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>crossfree – Play Windows games on your Mac (Apple silicon)</title>
-  <meta name="description" content="An open-source alternative to CrossOver for Apple silicon Macs. crossfree installs Steam, Epic Games and GOG for you and runs their Windows games with Wine and FEX.">
+  <meta name="description" content="An open-source alternative to CrossOver for Apple silicon Macs. crossfree installs Steam, Epic Games and GOG for you and runs Windows games with Wine and FEX.">
   <meta name="keywords" content="Windows games on Mac, Apple silicon gaming, CrossOver alternative, Whisky alternative, Wine for Mac, Steam on Mac, M1 M2 M3 M4 games, FEX, game launcher">
   <link rel="canonical" href="https://lithaxor.github.io/crossfree/">
   <meta name="theme-color" content="#0b0c10">
@@ -16,14 +16,14 @@
   <meta property="og:site_name" content="crossfree">
   <meta property="og:url" content="https://lithaxor.github.io/crossfree/">
   <meta property="og:title" content="crossfree – Play Windows games on your Mac">
-  <meta property="og:description" content="crossfree installs Steam, Epic Games, GOG and four other stores on your Mac and runs their Windows games with Wine and FEX. Free and open source.">
+  <meta property="og:description" content="crossfree installs Steam, Epic Games, GOG and other game stores on your Mac and runs Windows games with Wine and FEX. Free and open source.">
   <meta property="og:image" content="https://lithaxor.github.io/crossfree/og.jpg">
   <meta property="og:image:width" content="1280">
   <meta property="og:image:height" content="640">
   <meta property="og:image:alt" content="crossfree: play Windows games on your Mac">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="crossfree – Play Windows games on your Mac">
-  <meta name="twitter:description" content="crossfree installs Steam, Epic Games and GOG on your Mac and runs their Windows games with Wine and FEX. Free and open source.">
+  <meta name="twitter:description" content="crossfree installs Steam, Epic Games and GOG on your Mac and runs Windows games with Wine and FEX. Free and open source.">
   <meta name="twitter:image" content="https://lithaxor.github.io/crossfree/og.jpg">
 
   <script type="application/ld+json">
@@ -31,7 +31,7 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "crossfree",
-    "description": "An open-source alternative to CrossOver for Apple silicon Macs: crossfree installs Steam, Epic Games, GOG and four other stores and runs their Windows games with Wine and FEX.",
+    "description": "An open-source alternative to CrossOver for Apple silicon Macs: crossfree installs Steam, Epic Games, GOG and other game stores and runs Windows games with Wine and FEX.",
     "applicationCategory": "GameApplication",
     "operatingSystem": "macOS 26.4 or later on Apple silicon",
     "url": "https://lithaxor.github.io/crossfree/",
@@ -200,8 +200,8 @@
   <main class="page">
     <div class="hero">
       <h1>Play Windows games on your Mac.</h1>
-      <p class="lead">crossfree sets up Steam, Epic Games, GOG and four other stores for you, then runs their Windows
-        games on your Mac's own chip with Wine and FEX.</p>
+      <p class="lead">crossfree sets up Steam, Epic Games, GOG and other game stores for you, and runs Windows games
+        on your Mac's own chip with Wine and FEX.</p>
       <div class="actions">
         <a class="button primary" href="https://github.com/LitHaxor/crossfree/releases/latest">Download for macOS</a>
         <a class="button" href="https://github.com/LitHaxor/crossfree">Source on GitHub</a>
@@ -223,14 +223,15 @@
         <div class="row">
           <div>
             <h3>Your library, like a console</h3>
-            <p>Your games sit in one row, with their art from Steam. The arrow keys or a PlayStation or Xbox controller move
-              between them. Return plays, and a game that is already open comes back to the front.</p>
+            <p>Your games sit in one row, and Steam games bring their art from your Steam library. The arrow keys or a
+              PlayStation, Xbox or other MFi controller move between them. Return plays, and a game that is already
+              open comes back to the front.</p>
           </div>
           <div class="figure" data-figure="riffle"></div>
         </div>
         <div class="row">
           <div>
-            <h3>Seven stores in one Directory</h3>
+            <h3>Game stores in one Directory</h3>
             <p>Choose a store and crossfree downloads the installer from its maker, runs it, and adds the store to your
               library. A game's own setup.exe works too.</p>
             <ul class="facts">
@@ -250,7 +251,7 @@
           <div>
             <h3>Native on Apple silicon</h3>
             <p>Wine runs as arm64 code, and FEX translates only the game's own x86 and x64 instructions, as it runs them.
-              In the Dock, a game shows up under its own name, not as “wine”.</p>
+              In the Dock, Steam shows up as Steam, not as “wine”.</p>
           </div>
           <div class="figure" data-figure="laptop"></div>
         </div>
@@ -258,7 +259,7 @@
           <div>
             <h3>Free and open source</h3>
             <p>MIT licensed. The launcher is Rust, the app is SwiftUI, and GitHub Actions builds every release in the open.
-              There is no account, and nothing phones home.</p>
+              There is no account, and crossfree sends no telemetry.</p>
           </div>
           <div class="figure" data-figure="branches"></div>
         </div>
@@ -273,7 +274,7 @@
       <ol class="steps">
         <li><p>Download <a href="https://github.com/LitHaxor/crossfree/releases/latest">the latest crossfree DMG</a>,
           open it and drag <b>crossfree</b> to <b>Applications</b>.</p></li>
-        <li><div><p>This build is not notarized yet, so macOS blocks a downloaded copy. Clear the quarantine once:</p>
+        <li><div><p>If macOS won't open crossfree, the release you have isn't notarized. Clear the quarantine once:</p>
           <pre><code>xattr -dr com.apple.quarantine /Applications/crossfree.app</code></pre></div></li>
         <li><p>Open crossfree, go to <b>Directory</b> and install Steam or another store. Its games appear under
           <b>Games</b>.</p></li>
@@ -291,7 +292,7 @@
         <ul class="layers">
           <li><b>crossfree.app</b><span>The SwiftUI console: Games, Directory, Settings.</span></li>
           <li><b>crossfree CLI</b><span>A Rust launcher. It gives each game its own Windows, applies its settings and
-            finds its icon and Steam art.</span></li>
+            finds its icon, and for Steam games its art.</span></li>
           <li><b>Wine + FEX</b><span><a href="https://github.com/athei/mach9">mach9</a>'s signed, notarized arm64 Wine,
             shipped inside the app.</span></li>
           <li><b>Graphics</b><span>Direct3D 9 through mtld3d, 10 and 11 through DXMT, 12 through vkd3d-proton, all on
