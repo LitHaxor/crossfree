@@ -4,8 +4,8 @@
 
 <p align="center">
   <b>Play Windows games on your Mac.</b><br>
-  A free, open-source alternative to CrossOver for Apple silicon: a console-style launcher for
-  Steam, Epic Games, GOG and more, running on native arm64 Wine + FEX. No virtual machine, no Rosetta.
+  An open-source alternative to CrossOver for Apple silicon. crossfree sets up Steam, Epic Games, GOG
+  and four other stores for you, then runs their Windows games on your Mac's own chip with Wine and FEX.
 </p>
 
 <p align="center">
@@ -23,13 +23,13 @@
 - **Native on Apple silicon.** arm64 Wine runs Windows on your Mac directly, and [FEX](https://github.com/FEX-Emu/FEX)
   translates x86 and x64 game code to arm64. Direct3D 9 runs on Metal through mtld3d, Direct3D 10 and 11
   through DXMT, Direct3D 12 through vkd3d-proton.
-- **Every store, one click.** The Directory installs Steam, Epic Games, GOG Galaxy, Battle.net, the EA app,
-  Ubisoft Connect and the Rockstar Games Launcher from their official installers.
-- **A console on your Mac.** Full-window game art from your Steam library, Play and Resume, smooth spring
-  animations, and controller support (PlayStation, Xbox and other MFi pads) next to the keyboard.
-- **Feels like a Mac app.** Games appear in the Dock under their own names with their own icons, and crossfree
-  knows which games are running.
-- **Free and open source**, under the MIT license.
+- **Seven stores in one Directory.** Pick Steam, Epic Games, GOG Galaxy, Battle.net, the EA app, Ubisoft Connect
+  or the Rockstar Games Launcher, and crossfree runs the installer from its maker and adds the store to your games.
+- **A console on your Mac.** Your games in one row with their Steam art. Move with the arrow keys or a
+  PlayStation or Xbox controller; a game that is already open comes back to the front instead of starting twice.
+- **Feels like a Mac app.** In the Dock, a game shows up under its own name and icon, not as "wine", and
+  crossfree knows which games are running.
+- **Free and open source.** MIT licensed, with no account and nothing that phones home.
 
 ## Download
 
