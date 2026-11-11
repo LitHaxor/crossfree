@@ -83,6 +83,10 @@ struct StoreTests {
         settings: BottleSettings(d3d9: "auto", dxgi: "auto", msync: true, metalHud: false)
     )
     let game = AppShortcut(name: "Game", path: "/p/b/Game.lnk", icon: nil)
+    let steamGame = AppShortcut(name: "Some Game", path: "/p/b/Some Game.url", icon: nil, steamAppId: 10)
+    let steam = WineProcesses.Process(pid: 1, program: #"C:\Program Files (x86)\Steam\steam.exe"#, prefix: "/p/b")
+    let steamGameProcess = WineProcesses.Process(
+        pid: 2, program: #"C:\Program Files (x86)\Steam\steamapps\common\Some Game\Game.exe"#, prefix: "/p/b")
 
     /// ⌘R reloads the engine, the bottles and their apps; a loader that is
     /// not notarized is a warning that leaves the engine usable.
@@ -205,6 +209,63 @@ struct StoreTests {
         store.errorMessage = nil
         store.start(bottle, app: game)
         #expect(await eventually { fake.lines.filter { $0.hasSuffix("start b /p/b/Game.lnk") }.count == 2 })
+    }
+
+    /// Play on a Steam game brings up Steam; when the game ends, Steam is
+    /// told to quit (`-shutdown`), so nothing stays in the Dock.
+    @Test func theSteamPlayBroughtUpQuitsWhenItsGameEnds() async throws {
+        let fake = try FakeCLI(startFails: false)
+        let store = Store(cli: fake.cli)
+        await store.refresh()
+        var processes: [WineProcesses.Process] = []
+        store.wineProcesses = { processes }
+        let shutdowns = {
+            fake.lines.filter { $0.contains(" run b -- ") && $0.hasSuffix(#"\steam.exe -shutdown"#) }.count
+        }
+
+        store.start(bottle, app: steamGame)
+        #expect(store.steamSessions["b"] != nil)
+        let start = Date()
+        processes = [steam, steamGameProcess]
+        store.updateRunning(now: start)
+        processes = [steam]
+        store.updateRunning(now: start.addingTimeInterval(1))
+        #expect(store.steamSessions["b"] != nil)
+        store.updateRunning(now: start.addingTimeInterval(SteamSession.grace))
+        #expect(await eventually { shutdowns() == 1 })
+        #expect(store.steamSessions["b"] == nil)
+        store.updateRunning(now: start.addingTimeInterval(SteamSession.grace * 2))
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        #expect(shutdowns() == 1)
+    }
+
+    /// A Steam the player had open stays, and other games have no Steam
+    /// to quit.
+    @Test func aSteamAlreadyOpenIsLeftOpen() async throws {
+        let fake = try FakeCLI(startFails: false)
+        let store = Store(cli: fake.cli)
+        await store.refresh()
+        var processes = [steam]
+        store.wineProcesses = { processes }
+
+        store.start(bottle, app: steamGame)
+        #expect(store.steamSessions.isEmpty)
+        processes = []
+        store.start(bottle, app: game)
+        #expect(store.steamSessions.isEmpty)
+    }
+
+    /// A Steam game that could not start has no Steam to follow.
+    @Test func aFailedStartFollowsNoSteam() async throws {
+        let fake = try FakeCLI()
+        let store = Store(cli: fake.cli)
+        await store.refresh()
+        store.wineProcesses = { [] }
+
+        store.start(bottle, app: steamGame)
+        #expect(store.steamSessions["b"] != nil)
+        #expect(await eventually { store.errorMessage != nil })
+        #expect(store.steamSessions.isEmpty)
     }
 
     /// An installer gets a Windows of its own, named after it; one for a

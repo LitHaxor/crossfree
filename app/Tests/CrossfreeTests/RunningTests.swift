@@ -72,4 +72,41 @@ struct RunningTests {
             WineProcesses.runs(AppShortcut(name: "x", path: "/p/x.lnk", icon: nil), prefix: "/p/Steam", in: processes)
                 .isEmpty)
     }
+
+    /// A Steam that Play brought up quits once no Steam game has run for
+    /// ``SteamSession/grace``; a short gap (a launcher handing over to its
+    /// game) is not the end.
+    @Test func steamQuitsWhenItsGamesHaveEnded() {
+        let steam = WineProcesses.Process(pid: 1, program: #"C:\Program Files (x86)\Steam\steam.exe"#, prefix: "/p/b/")
+        let game = WineProcesses.Process(
+            pid: 2, program: #"C:\Program Files (x86)\Steam\steamapps\common\Some Game\Game.exe"#, prefix: "/p/b")
+        let elsewhere = WineProcesses.Process(
+            pid: 3, program: #"D:\SteamLibrary\steamapps\common\Other\Other.exe"#, prefix: "/elsewhere")
+        let start = Date()
+        let at = { (seconds: Double) in start.addingTimeInterval(seconds) }
+        var session = SteamSession(prefix: "/p/b")
+
+        // Steam starting, updating or showing its login: no game yet.
+        #expect(session.step([], now: at(0)) == .wait)
+        #expect(session.step([steam], now: at(60)) == .wait)
+        #expect(session.step([steam, game], now: at(61)) == .wait)
+        #expect(session.step([steam], now: at(65)) == .wait)
+        #expect(session.step([steam, game], now: at(66)) == .wait)
+        // Another install's game does not keep this Steam.
+        #expect(session.step([steam, elsewhere], now: at(66 + SteamSession.grace)) == .quit(steam.program))
+    }
+
+    /// Steam gone (closed by the player) ends the session without a quit;
+    /// gone only for a restart (an update) does not.
+    @Test func steamGoneOnItsOwnNeedsNoQuit() {
+        let steam = WineProcesses.Process(pid: 1, program: #"C:\Steam\Steam.exe"#, prefix: "/p/b")
+        let start = Date()
+        var session = SteamSession(prefix: "/p/b")
+        #expect(session.step([steam], now: start) == .wait)
+        #expect(session.step([], now: start.addingTimeInterval(3)) == .wait)
+        #expect(session.step([steam], now: start.addingTimeInterval(6)) == .wait)
+        #expect(session.step([], now: start.addingTimeInterval(6 + SteamSession.grace)) == .done)
+        #expect(SteamSession.steam(in: [steam], prefix: "/p/b") == steam)
+        #expect(SteamSession.steam(in: [steam], prefix: "/p/other") == nil)
+    }
 }

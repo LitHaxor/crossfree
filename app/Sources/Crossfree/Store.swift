@@ -36,6 +36,11 @@ final class Store: ObservableObject {
     private(set) var starting: [String: Date] = [:]
     /// The wait for each game's window (``bringToFront(_:_:)``), by ID.
     private var windowWaits: [String: Task<Void, Never>] = [:]
+    /// The Steams that Play brought up, to quit when their games end (see
+    /// ``SteamSession``), by bottle name.
+    private(set) var steamSessions: [String: SteamSession] = [:]
+    /// Wine's running processes; tests replace it.
+    var wineProcesses: () -> [WineProcesses.Process] = WineProcesses.list
     /// When each app (by shortcut path) was last opened from crossfree.
     @Published private(set) var lastPlayed: [String: Date] = [:]
     /// The store from the catalog being installed, if any.
@@ -473,12 +478,43 @@ final class Store: ObservableObject {
         defaults?.set(lastPlayed.mapValues(\.timeIntervalSince1970), forKey: Store.lastPlayedKey)
         if !isStarting(app) {
             starting[app.id] = Date()
+            let followsSteam = followSteam(bottle, app)
             spawn(bottle, ["start", bottle.name, app.path], what: "“\(app.name)”", statusIsFailure: true) {
                 [weak self] in
                 self?.starting[app.id] = nil
+                if followsSteam { self?.steamSessions[bottle.name] = nil }
             }
         }
         bringToFront(bottle, app)
+    }
+
+    /// Follows the Steam that starting a Steam game brings up, to quit it
+    /// when the game ends; not a Steam that runs already. `true` if it
+    /// starts following one.
+    private func followSteam(_ bottle: Bottle, _ app: AppShortcut) -> Bool {
+        guard app.steamAppId != nil, steamSessions[bottle.name] == nil,
+            SteamSession.steam(in: wineProcesses(), prefix: bottle.path) == nil
+        else { return false }
+        steamSessions[bottle.name] = SteamSession(prefix: bottle.path)
+        return true
+    }
+
+    /// Quits each followed Steam whose games have ended.
+    func updateSteam(_ processes: [WineProcesses.Process], now: Date) {
+        for (name, session) in steamSessions {
+            var session = session
+            switch session.step(processes, now: now) {
+            case .wait:
+                steamSessions[name] = session
+            case .done:
+                steamSessions[name] = nil
+            case .quit(let steam):
+                steamSessions[name] = nil
+                // Steam's own way out: the running Steam gets the command,
+                // syncs cloud saves and exits.
+                try? cli?.spawn(["run", name, "--", steam, "-shutdown"], log: logURL(named: name)) { _, _ in }
+            }
+        }
     }
 
     /// Whether a game started from Play is still coming up: no window yet,
@@ -503,11 +539,13 @@ final class Store: ObservableObject {
         }
     }
 
-    /// Updates ``runningGames`` from Wine's processes, and notes the
-    /// starting games whose window came up meanwhile (a slow one may take
-    /// longer than ``bringToFront(_:_:)`` waits).
-    func updateRunning() {
-        let processes = WineProcesses.list()
+    /// Updates ``runningGames`` from Wine's processes, notes the starting
+    /// games whose window came up meanwhile (a slow one may take longer
+    /// than ``bringToFront(_:_:)`` waits), and quits the Steams of games
+    /// that ended (``updateSteam(_:now:)``).
+    func updateRunning(now: Date = Date()) {
+        let processes = wineProcesses()
+        updateSteam(processes, now: now)
         let running = Set(
             allApps.filter { item in
                 !WineProcesses.runs(item.app, prefix: item.bottle.path, in: processes).isEmpty
@@ -632,8 +670,12 @@ final class Store: ObservableObject {
     }
 
     func logURL(_ bottle: Bottle) -> URL {
+        logURL(named: bottle.name)
+    }
+
+    private func logURL(named name: String) -> URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Logs/crossfree/\(bottle.name).log")
+            .appendingPathComponent("Library/Logs/crossfree/\(name).log")
     }
 
     func openLog(_ bottle: Bottle) {

@@ -53,7 +53,7 @@ enum WineProcesses {
         path.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "\\")) + "\\"
     }
 
-    private static func normalized(_ path: String) -> String {
+    static func normalized(_ path: String) -> String {
         URL(fileURLWithPath: path).standardizedFileURL.path
     }
 
@@ -89,5 +89,60 @@ enum WineProcesses {
         let program = strings[1].trimmingCharacters(in: .whitespaces)
         guard program.count > 3, program.dropFirst().hasPrefix(":\\") else { return nil }
         return Process(pid: pid, program: program, prefix: String(prefix))
+    }
+}
+
+/// A Steam that came up only because Play started a Steam game in an
+/// install where Steam was not running. Quitting the game ends it too, as
+/// on a console: otherwise Steam stays in the Dock under the game's name
+/// (the launcher ran it as the game). A Steam the player had open stays.
+struct SteamSession: Equatable {
+    enum Step: Equatable {
+        case wait
+        /// Ask Steam (its program, `C:\…\steam.exe`) to quit.
+        case quit(String)
+        /// Steam is gone: nothing left to do.
+        case done
+    }
+
+    /// The install (`WINEPREFIX`).
+    let prefix: String
+    /// When a Steam game, and Steam, last ran.
+    private(set) var lastGame: Date?
+    private(set) var lastSteam: Date?
+
+    /// How long nothing may run before it counts as ended: a game's own
+    /// launcher can exit before the game shows up, and Steam restarts
+    /// itself when it updates.
+    static let grace: TimeInterval = 10
+
+    init(prefix: String) {
+        self.prefix = prefix
+    }
+
+    /// What to do now that `processes` run. Steam's games run from a
+    /// `steamapps` folder; any of them keeps Steam (another one started
+    /// from Steam meanwhile, say).
+    mutating func step(_ processes: [WineProcesses.Process], now: Date) -> Step {
+        let own = Self.inPrefix(prefix, processes)
+        let steam = Self.steam(in: own, prefix: prefix)
+        if own.contains(where: { $0.program.lowercased().contains(#"\steamapps\"#) }) { lastGame = now }
+        if steam != nil { lastSteam = now }
+        let quiet = { (since: Date?) in since.map { now.timeIntervalSince($0) >= Self.grace } ?? false }
+        if let steam {
+            return quiet(lastGame) ? .quit(steam.program) : .wait
+        }
+        return quiet([lastGame, lastSteam].compactMap { $0 }.max()) ? .done : .wait
+    }
+
+    /// Steam's client (`steam.exe`) among the processes of the install at
+    /// `prefix`.
+    static func steam(in processes: [WineProcesses.Process], prefix: String) -> WineProcesses.Process? {
+        inPrefix(prefix, processes).first { $0.program.lowercased().hasSuffix(#"\steam.exe"#) }
+    }
+
+    private static func inPrefix(_ prefix: String, _ processes: [WineProcesses.Process]) -> [WineProcesses.Process] {
+        let prefix = WineProcesses.normalized(prefix)
+        return processes.filter { WineProcesses.normalized($0.prefix) == prefix }
     }
 }
