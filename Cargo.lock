@@ -4,8 +4,8 @@ version = 4
 
 [[package]]
 name = "compatdb-core"
-version = "0.3.1"
-source = "git+https://github.com/athei/mach9?tag=v0.3.1#39f186e88de52e1960341d9939e5bf5ebb2a889d"
+version = "0.4.0"
+source = "git+https://github.com/athei/mach9?tag=v0.4.0#cc71942acedec93aa48c98fcdba73ddf0f383399"
 
 [[package]]
 name = "d3d9-bytecode"

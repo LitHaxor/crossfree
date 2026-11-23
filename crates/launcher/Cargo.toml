@@ -17,7 +17,7 @@ path = "src/main.rs"
 [dependencies]
 # The engine's rule format. Must be the same release as the engine bundle
 # (mach9's launcher contract); see docs/spikes/s5-arm64-wine-fex.md.
-compatdb-core = { git = "https://github.com/athei/mach9", tag = "v0.3.1" }
+compatdb-core = { git = "https://github.com/athei/mach9", tag = "v0.4.0" }
 
 [lints]
 workspace = true
